@@ -19,10 +19,21 @@ newtype Model (v :: Type -> Type) = Model DrinkType
 -- You will need to define data types for the SetDrinkTea and
 -- SetDrinkHotChocolate commands, along with HTraversable instances.
 
+-- input type
 data SetDrinkCoffee (v :: Type -> Type) = SetDrinkCoffee deriving Show
 
 instance HTraversable SetDrinkCoffee where
   htraverse _ _ = pure SetDrinkCoffee
+
+data SetDrinkTea (v :: Type -> Type) = SetDrinkTea deriving Show
+
+instance HTraversable SetDrinkTea where
+  htraverse _ _ = pure SetDrinkTea
+
+data SetDrinkHotChocolate (v :: Type -> Type) = SetDrinkHotChocolate deriving Show
+
+instance HTraversable SetDrinkHotChocolate where
+  htraverse _ _ = pure SetDrinkHotChocolate
 
 cSetDrinkCoffee
   :: forall g m. (MonadGen g, MonadTest m, MonadIO m)
@@ -52,19 +63,47 @@ cSetDrinkHotChocolate
   :: forall g m. (MonadGen g, MonadTest m, MonadIO m)
   => C.Machine
   -> Command g m Model
-cSetDrinkHotChocolate = undefined
+cSetDrinkHotChocolate machine = Command gen exec
+  [
+    Update $ \_ _ _ -> Model HotChocolate
+  , Ensure $ \_ _ _ drink -> case drink of
+      C.HotChocolate -> success
+      _ -> failure
+  ]
+  where
+    gen :: Model Symbolic -> Maybe (g (SetDrinkHotChocolate Symbolic))
+    gen _ = Just $ pure SetDrinkHotChocolate
+
+    exec :: SetDrinkHotChocolate Concrete -> m C.Drink
+    exec _ = do
+      C.hotChocolate machine
+      view C.drinkSetting <$> C.peek machine
 
 cSetDrinkTea
   :: forall g m. (MonadGen g, MonadTest m, MonadIO m)
   => C.Machine
   -> Command g m Model
-cSetDrinkTea = undefined
+cSetDrinkTea machine = Command gen exec
+  [
+    Update $ \_ _ _ -> Model Tea
+  , Ensure $ \_ _ _ drink -> case drink of
+      C.Tea{} -> success
+      _ -> failure
+  ]
+  where
+    gen :: Model Symbolic -> Maybe (g (SetDrinkTea Symbolic))
+    gen _ = Just $ pure SetDrinkTea
+
+    exec :: SetDrinkTea Concrete -> m C.Drink
+    exec _ = do
+      C.tea machine
+      view C.drinkSetting <$> C.peek machine
 
 stateMachineTests :: TestTree
 stateMachineTests = testProperty "State Machine Tests" . property $ do
   mach <- C.newMachine
 
-  let initialModel = Model HotChocolate
+  let initialModel = Model Coffee
       commands = ($ mach) <$>
         [ cSetDrinkCoffee
         , cSetDrinkHotChocolate
